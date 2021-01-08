@@ -1,0 +1,147 @@
+ 
+ Demonstrate various Linux utilties to monitor virtual memory.
+ 
+  ---------
+ /  TOP  /
+ ---------
+ 
+ Pick a larg-ish process that has been running for some time. Mysql has been 
+ running for 559 hours and 32 minutes (roughly 24 days).
+ $ top -p 4410
+ Hit 'f' and toggle SWAP, DATA, nMaj, nMin, nDIRT 
+
+  PID USER        PR  NI  VIRT  RES  SHR S  %CPU %MEM    TIME+  COMMAND   
+  4410 mysql     20   0  508m 220m 5288 S   0.3  0.3 559:32.96 mysqld   
+ 
+ This is the result:
+ VIRT  RES  SHR  %CPU %MEM TIME+     COMMAND     SWAP CODE DATA nMaj nMin nDRT
+ 508m  234m 5388  0.0  0.4 584:08.34 mysqld       12m  10m 463m 8501  19m    0
+ 
+ Refer to these excerpts from the top manpage to know what the columns mean:
+ 
+  m: TIME+  --  CPU Time, hundredths
+     The same as TIME, but reflecting  more  granularity  through  hun
+     dredths of a second.
+  n: %MEM  --  Memory usage (RES)
+     A tasks currently used share of available physical memory.
+  o: VIRT  --  Virtual Image (kb)
+     The  total  amount  of virtual memory used by the task.  It includes
+     all code, data and  shared  libraries  plus  pages  that  have  been
+     swapped out.
+  p: SWAP  --  Swapped size (kb)
+     The swapped out portion of a tasks total virtual memory image.
+  q: RES  --  Resident size (kb)
+     The non-swapped physical memory a task has used.
+  r: CODE  --  Code size (kb)
+     The  amount of virtual memory devoted to executable code, also known
+     as the text resident set size or TRS.
+  s: DATA  --  Data+Stack size (kb)
+     The amount of virtual memory devoted to other than executable code,
+     also known as the data resident set size or DRS.
+  t: SHR  --  Shared Mem size (kb)
+     The amount of shared memory used by a task.  It simply reflects mem
+     ory that could be potentially shared with other processes.
+  u: nFLT  --  Page Fault count
+     The number of major page faults that have occurred for  a  task.   A
+     page fault occurs when a process attempts to read from or write to a
+     virtual page that is not currently present in its address space.   A
+     major  page fault is when backing storage access (such as a disk) is
+     involved in making that page available.
+  v: nDRT  --  Dirty Pages count
+     The number of pages that have been modified  since  they  were  last
+     written to disk. Dirty pages must be written to disk before the
+     corresponding physical memory location can be used  for  some  other
+     virtual page.
+ 
+ -------------------------
+ / VIRTUAL MEMORY STATS  /
+ ------------------------
+ 
+   $ vmstat -a 2 5              #  2 second intervals for a count of 5 
+ 
+ procs -----------memory---------- ---swap-- -----io---- -system-- ----cpu----
+ r  b   swpd free     inact   active   si so bi  bo  in   cs   us sy id wa
+ 0  2   1084 54083908 3759780 7024436  0  0  21  44  0    0    6  0  93  0
+ 0  0   1084 54085712 3759772 7023240  0  0   0  200 261  1112 0  0  99  0
+ 1  0   1084 54072820 3759664 7036436  0  0   0  20  185  975  3  1  97  0
+ 0  0   1084 54085084 3759780 7023236  0  0   0  148 99   751  2  0  97  1
+ 0  0   1084 54083532 3759700 7023436  0  0   0  136 175  965  2  1  96
+ Linux 2.6.26-2-amd64 (sleipnir)   05/12/2011   _x86_64_
+ 
+ ----------------------------
+ /  SYSTEM ACTIVITY REPORT  /
+ ----------------------------
+ 
+    $ sar -B  5 2             # -B report paging statistics
+ 
+ time pgpgin/s pgpgout/s fault/s majflt/s pgfree/s pgscank/s pgscand/s pgsteal 
+ 8:24:42  0.00     0.00   866.34     0.00   222.28     0.00     0.00    0.00   
+ 8:24:44  0.00    98.04    18.14     0.00   102.94     0.00     0.00    0.00  
+ 8:24:46  0.00   325.49   869.61     0.00   241.67     0.00     0.00    0.00  
+ 8:24:48  0.00    11.88     9.41     0.00    72.77     0.00     0.00    0.00  
+ 8:24:50  0.00   336.95     8.37     0.00    56.65     0.00     0.00    0.00  
+ Average: 0.00   154.88   354.38     0.00   139.31     0.00     0.00    0.00 
+ 
+ Major faults occur when a reference is made to a page not present in main 
+ memory. A major fault requires a disk access to bring the page in.
+ 
+ Minor faults occur when an access to a memory location *is* to a page in 
+ memory but without correct permissions. This occurs when the kernel must 
+ perform a copy-on-write and thus allow the task to update the page.
+ 
+   $  sar -r 2 5     # -r report memory utilization stats
+ 
+ Linux 2.6.26-2-amd64 (sleipnir)         05/12/2011      _x86_64_
+ 
+ 08:07:12 PM kbmemfree kbmemused  %memused kbbuffers  kbcached kbswpfree kbswpused  %swpused  kbswpcad
+ 08:07:14 PM  54044392  12139504     18.34   1181548   8078756  17562556 1084      0.01         0
+ 08:07:16 PM  54044640  12139256     18.34   1181548   8078748  17562556 1084      0.01         0
+ 08:07:18 PM  54044816  12139080     18.34   1181548   8078756  17562556 1084      0.01         0
+ 08:07:20 PM  54046048  12137848     18.34   1181548   8078764  17562556 1084      0.01         0
+ 08:07:22 PM  54034864  12149032     18.36   1181548   8078764  17562556 1084      0.01         0
+ Average:     54042952  12140944     18.34   1181548   8078758  17562556 1084      0.01         0
+ 
+  ------------------
+ /  PROCESS STAT   / 
+ ------------------
+ 
+     $ pidstat -r 1 7 -p SELF    # perform 7 tests 1 second apart on pidstat 
+ 
+ Linux 2.6.26-2-amd64 (sleipnir)   05/14/2011   _x86_64_
+ 
+ 04:31:30 PM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
+ 04:31:31 PM     29744      8.00      0.00    5064    728   0.00  pidstat
+ 04:31:32 PM     29744     11.00      0.00    5064    756   0.00  pidstat
+ 04:31:33 PM     29744      4.00      0.00    5064    756   0.00  pidstat
+ 04:31:34 PM     29744      4.00      0.00    5064    756   0.00  pidstat
+ 04:31:35 PM     29744      4.00      0.00    5064    756   0.00  pidstat
+ 04:31:36 PM     29744      4.00      0.00    5064    756   0.00  pidstat
+ 04:31:37 PM     29744      4.00      0.00    5064    756   0.00  pidstat
+ Average:        29744      5.57      0.00    5064    752   0.00  pidstat
+ Filename        Type    Size  Used  Priority
+ 
+ --------------
+ /  SWAPON   /
+ -------------
+ 
+ $ /sbin/swapon -s          # show how much swap space you currently have
+ Filename    Type       Size      Used    Priority
+ /dev/dm-1   partition  17563640  238592  -1
+ 
+ $ /usr/bin/time /bin/true    # do nothing but return true
+ 
+ 0.00user 0.00system 0:00.00elapsed ?%CPU (0avgtext+0avgdata 1472maxresident)k
+ 0inputs+0outputs (0major+127minor)pagefaults 0swaps
+ 
+ 
+ ------------
+ /  FREE    /
+ ------------
+ 
+ $ free -k   # display stats in kilobytes
+ 
+              total       used       free     shared    buffers     cached
+ Mem:      66180668   36178556   30002112          0    2064568   29974080
+ -/+ buffers/cache:    4139908   62040760
+ Swap:     17563644     297792   17265852
+ 

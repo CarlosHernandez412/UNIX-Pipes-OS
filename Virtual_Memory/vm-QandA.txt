@@ -1,0 +1,86 @@
+
+Knowing how the kernel manages virtual memory and using tools to monitor
+usage is part of good coding practice as well as good system administration.
+It is impossible to eliminate page faults, the goal is that your code is
+written in such a way as to minimize them. In this part of the lab you will
+utilize Linux tools to monitor virtual memory usage.
+
+Start by reading vm-monitoring.txt.
+
+The file describes the various Linux tools you can use to monitor virtual
+memory usage and behavior.
+
+-------------
+QUESTION ONE
+-------------
+Virtual memory (VIRT) includes SHR + SWAP + CODE + DATA. But the sum of these 
+chunks is not as large as the total of VIRT. As an example, look at mysql. 
+
+VIRT  RES  SHR  %CPU %MEM TIME+     COMMAND     SWAP CODE DATA nMaj nMin nDRT
+508m  234m 5388  0.0  0.4 584:08.34 mysqld       12m  10m 463m 8501  19m    0
+
+VIRT = 508m
+SHR + SWAP + CODE + DATA = .5388 + 12 + 10 + 463 = 455.54m
+508m - 455.54m = 52.46m
+
+Where is the 52.46m of virtual memory?
+
+A: Even the smallest process image is allocated a huge amount of virtual
+memory. Most of this memory will never be allocated into pages of physical
+memory or even swap space. Some of the *missing* virtual memory is in kernel 
+space reserved for internal buffers etc. Processes such as mysql need a lot
+of virtual memory in kernel space. But the big reason is that mysql spawns
+21 threads that are scheduled across all 8 processors. This requires a lot
+of stack space for each thread!
+
+
+  PID USER      VIRT  RES  SHR S COMMAND    nTH P SWAP CODE DATA nMaj nMin nDRT
+17066 mysql     491m 208m 8400 S mysqld      22 0    0  10m 438m    2 134k    0
+
+-------------
+QUESTION TWO 
+-------------
+Run top. Hit 'f' then toggle on the columns to view major and page faults by
+hitting space. Hit 'q' to return. Look at the nFLT column. Note that few 
+processes on the system generate major page faults. Note also that sleipnir 
+has 64 GB of memory and it appears that only a small percentage is used.
+
+Q: Why are there major page faults at all?  
+A: In a nutshell: Smart Load Control. If some code or other stuff isn't being 
+used, the kernel will still page it out to make more room in memory for the 
+disk cache, therefore increasing performance. This behavior is controlled by
+the "swappiness" of a system. On sleipnir:
+
+ $  cat /proc/sys/vm/swappiness
+ 60
+
+
+---------------
+QUESTION THREE 
+---------------
+Run this command:
+
+        $ pidstat -r -p SELF 1 8
+
+Note that there is a flurry of minor page faults soon after the start of
+execution:
+
+Linux 3.2.0-4-amd64 (sleipnir) 	02/24/14 	_x86_64_	(8 CPU)
+
+16:45:55          PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
+16:45:56          935      6.00      0.00    4124    728   0.00  pidstat
+16:45:57          935     15.00      0.00    4124    772   0.00  pidstat
+16:45:58          935      4.00      0.00    4124    772   0.00  pidstat
+16:45:59          935      4.00      0.00    4124    772   0.00  pidstat
+16:46:00          935      4.00      0.00    4124    772   0.00  pidstat
+16:46:01          935      4.00      0.00    4124    772   0.00  pidstat
+16:46:02          935      4.00      0.00    4124    772   0.00  pidstat
+16:46:03          935      4.00      0.00    4124    772   0.00  pidstat
+Average:          935      5.62      0.00    4124    766   0.00  pidstat
+
+Q: Why is your process generating minor page faults?
+A: This is due to the copy-on-write (COW) behavior of linux after the fork(). A
+minor page is when a page in the child is actually loaded into memory. This is
+not the same as a major page fault since the page in the child was not in memory
+to begin with. A process with a lot of minor page faults is a large process
+that was forked. The minor faults always occur at program startup.
